@@ -2,9 +2,9 @@
 # server, /srv/sites/<name>. update-sites serves the repo's `deploy` branch, which the shared build writes.
 aero         LambdaIITH/aero-website
 cepheid      LambdaIITH/cepheid-website
-elektronica  LambdaIITH/elektronica-website
+# elektronica  LambdaIITH/elektronica-website   (waiting for the club's approval)
 epoch        LambdaIITH/epoch-website
-glitch       LambdaIITH/glitch-website
+# glitch       LambdaIITH/glitch-website        (waiting for the club's approval)
 infero       LambdaIITH/infero-website
 prakriti     LambdaIITH/prakriti-website
 robotix      LambdaIITH/robotix-website
