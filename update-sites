@@ -1,0 +1,54 @@
+#!/bin/bash
+# Puts the newest build of every site listed in ./sites live. Runs every 5 minutes from cron as the account that
+# owns /srv/sites (install.sh adds the cron line). For each site it fetches the `deploy` branch of the site's
+# repo, unpacks a new build next to the old ones and switches /srv/sites/<name>/current to it in one atomic step,
+# keeping the live build and the two before it. A site whose build hasn't changed is skipped, and a site that
+# fails (repo or branch missing, network down, a build without index.html) never stops the others.
+set -uo pipefail
+export GIT_TERMINAL_PROMPT=0 # a missing repo must fail, not wait for a password
+
+here=$(cd "$(dirname "$0")" && pwd)
+SITES=${SITES:-$here/sites}
+ROOT=${ROOT:-/srv/sites}
+GITHUB=${GITHUB:-https://github.com}
+
+exec 9>"$ROOT/.update-sites.lock"
+flock -n 9 || exit 0 # the previous run is still going
+
+deploy() { # <name> <owner/repo>
+    local name=$1 repo=$2 dir=$ROOT/$1 rev
+    [[ $name =~ ^[a-z0-9-]+$ ]] || { echo "skipped bad site name '$name'"; return 1; }
+    [[ $repo =~ ^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$ ]] || { echo "$name: bad repo '$repo'"; return 1; }
+
+    mkdir -p "$dir/releases" || return 1
+    if [ ! -d "$dir/repo.git" ]; then
+        git clone -q --bare --single-branch --branch deploy "$GITHUB/$repo.git" "$dir/repo.git" || return 1
+    fi
+    git --git-dir="$dir/repo.git" fetch -q origin +deploy:deploy || return 1
+    rev=$(git --git-dir="$dir/repo.git" rev-parse deploy) || return 1
+    [ "$(cat "$dir/live-rev" 2>/dev/null)" = "$rev" ] && return 0
+
+    if [ ! -d "$dir/releases/$rev" ]; then
+        rm -rf "$dir/releases/$rev.tmp"
+        mkdir "$dir/releases/$rev.tmp" &&
+            git --git-dir="$dir/repo.git" archive "$rev" | tar -x -C "$dir/releases/$rev.tmp" || return 1
+        if [ ! -f "$dir/releases/$rev.tmp/index.html" ]; then
+            rm -rf "$dir/releases/$rev.tmp"
+            echo "$name: build $rev has no index.html, so the live one stays"
+            return 1
+        fi
+        mv "$dir/releases/$rev.tmp" "$dir/releases/$rev" || return 1
+    fi
+    # atomic: a visitor gets the old build or the new one, never half of each
+    ln -sfn "releases/$rev" "$dir/current.tmp" && mv -T "$dir/current.tmp" "$dir/current" || return 1
+    echo "$rev" >"$dir/live-rev"
+    echo "$name: live $rev"
+    ls -1dt "$dir"/releases/*/ | grep -vxF "$dir/releases/$rev/" | tail -n +3 | xargs -r rm -rf || true
+}
+
+status=0
+while read -r name repo _; do
+    [[ -z ${name:-} || $name == \#* ]] && continue
+    deploy "$name" "${repo:-}" || { echo "$name: not updated"; status=1; }
+done <"$SITES"
+exit $status

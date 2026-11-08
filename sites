@@ -1,0 +1,11 @@
+# One line per site: <name> <GitHub repo>. The name is also its address, <name>.iith.dev, and its folder on the
+# server, /srv/sites/<name>. update-sites serves the repo's `deploy` branch, which the shared build writes.
+aero         LambdaIITH/aero-website
+cepheid      LambdaIITH/cepheid-website
+elektronica  LambdaIITH/elektronica-website
+epoch        LambdaIITH/epoch-website
+glitch       LambdaIITH/glitch-website
+infero       LambdaIITH/infero-website
+prakriti     LambdaIITH/prakriti-website
+robotix      LambdaIITH/robotix-website
+torque       LambdaIITH/torque-website
